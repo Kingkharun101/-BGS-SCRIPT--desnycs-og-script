@@ -1,0 +1,398 @@
+local Library = loadstring(game:HttpGet("https://raw.githubusercontent.com/fk123212/theme-for-auto-trade/main/thethemeomg"))()
+local Window = Library.CreateLib("BGS Auto Trade", "Midnight")
+local Player = game.Players.LocalPlayer
+local TradeFrame = Player.PlayerGui.ScreenGui.TradeFrame
+local TradeSendDelay = 0
+local TradeAcceptDelay = 0
+local TradeConfirmDelay = 0
+
+function SendTrade(Player)
+	task.wait(TradeSendDelay)
+	local args = {
+		[1] = "TradeSendRequest",
+		[2] = Player
+	}
+
+	game:GetService("ReplicatedStorage").NetworkRemoteEvent:FireServer(unpack(args))
+end
+
+function AddPet(ItemID)
+	local args = {
+		[1] = "TradeAddItem",
+		[2] = ItemID
+	}
+
+	game:GetService("ReplicatedStorage").NetworkRemoteEvent:FireServer(unpack(args))
+	return
+end
+
+function RemovePet(ItemID)
+	local args = {
+		[1] = "TradeRemoveItem",
+		[2] = ItemID
+	}
+
+	game:GetService("ReplicatedStorage").NetworkRemoteEvent:FireServer(unpack(args))
+	return
+end
+
+function AcceptTrade()
+	task.wait(TradeAcceptDelay)
+	local args = {
+		[1] = "TradeReady"
+	}
+
+	game:GetService("ReplicatedStorage").NetworkRemoteEvent:FireServer(unpack(args))
+	return
+end
+
+function ConfirmTrade()
+	task.wait(TradeConfirmDelay)
+	local args = {
+		[1] = "TradeConfirm"
+	}
+
+	game:GetService("ReplicatedStorage").NetworkRemoteEvent:FireServer(unpack(args))
+	return
+end
+
+function CheckIfFreeSpace()
+	if #TradeFrame.YourOffer.Frame:GetChildren() == 9 then
+		return false
+	else
+		return true
+	end
+end
+
+function CheckIfOwn(ItemID)
+	local ItemOwned = false
+
+	for i,v in pairs(TradeFrame.TheirInventory.Grid:GetChildren()) do
+		if v:IsA("ImageButton") then
+			if v.Name == ItemID then
+				ItemOwned = true
+				break
+			end
+		end
+	end
+
+	if #TradeFrame.TheirInventory.Grid:GetChildren() == 1 then
+		ItemOwned = false
+	end
+
+	return ItemOwned
+end
+
+function DeleteItem(ItemID)
+	local args = {
+		[1] = "DeletePet",
+		[2] = ItemID
+	}
+
+	game:GetService("ReplicatedStorage").NetworkRemoteEvent:FireServer(unpack(args))
+	return
+end
+
+function UnlockItem(ItemID)
+
+	local args = {
+		[1] = "SetPetLocked",
+		[2] = ItemID,
+		[3] = false
+	}
+
+	game:GetService("ReplicatedStorage").NetworkRemoteEvent:FireServer(unpack(args))
+	return
+end
+
+function DealWithCustom(C, SplitString)
+
+	TradeFrame.YourInventory.Search.TextBox.Text = SplitString[2] or SplitString[1]
+	
+	coroutine.resume(coroutine.create(function()
+		for i,v in pairs(TradeFrame.YourInventory.Grid:GetChildren()) do
+			if TradeFrame.Visible == true then
+				if v:FindFirstChild("Frame") then
+					if CheckIfFreeSpace() then
+						if v.Frame.Tick.Visible == true then else
+							if CheckIfOwn(v.Name) == true then else
+								local String2 = _G.PetsToGive[C]
+								local SplitString2 = String2:split(' ')
+
+								local SplitStringName = SplitString[2]
+
+								if SplitString[2] == nil then
+									SplitStringName = SplitString[1]
+								elseif SplitString[1] == nil then
+									SplitStringName = SplitString[2]
+								end
+
+								if string.lower(v.Frame.Inner.PetName.Text) == string.lower(SplitStringName) then
+									if string.lower(SplitString2[1]) == string.lower("Shiny") then
+										if v.Frame.Inner.ImageColor3 ~= Color3.fromRGB(0, 179, 255) then
+											AddPet(v.Name)
+											table.remove(_G.PetsToGive, v.Frame.Inner.PetName.Text)
+											return
+										end
+									else
+										if v.Frame.Inner.ImageColor3 == Color3.fromRGB(0, 179, 255) then
+											AddPet(v.Name)
+											table.remove(_G.PetsToGive, v.Frame.Inner.PetName.Text)
+											return 
+										end
+									end
+								end
+							end
+						end
+					else
+						AcceptTrade()
+						repeat
+							ConfirmTrade()
+							game:GetService("RunService").RenderStepped:Wait()
+						until TradeFrame.TheirOffer.Ready.Visible == true or TradeFrame.Processing.Visible == true
+						return
+					end
+					game:GetService("RunService").RenderStepped:Wait()
+				end
+				game:GetService("RunService").RenderStepped:Wait()
+			end
+			game:GetService("RunService").RenderStepped:Wait()
+		end
+	end))
+	game:GetService("RunService").RenderStepped:Wait()
+end
+
+function DoCustomPets(Option)
+	if Option == "Add" then
+		if TradeFrame.Visible == true then
+			coroutine.resume(coroutine.create(function()
+				for C,S in pairs(_G.PetsToGive) do
+					local String = _G.PetsToGive[C]
+					local SplitString = String:split(string.lower("Shiny "))
+					game:GetService("RunService").RenderStepped:Wait()
+					DealWithCustom(C, SplitString)
+					game:GetService("RunService").RenderStepped:Wait()
+				end
+			end))
+			AcceptTrade()
+			repeat
+				ConfirmTrade()
+				game:GetService("RunService").RenderStepped:Wait()
+			until TradeFrame.TheirOffer.Ready.Visible == true or TradeFrame.Processing.Visible == true
+			return
+		end
+	elseif Option == "Remove" then
+		coroutine.resume(coroutine.create(function()
+			for i,v in pairs(TradeFrame.YourOffer.Frame:GetChildren()) do
+				if v:IsA("Frame") then
+					RemovePet(v.GUID.Value)
+					game:GetService("RunService").RenderStepped:Wait()				
+				end
+				game:GetService("RunService").RenderStepped:Wait()
+			end
+			game:GetService("RunService").RenderStepped:Wait()
+		end))
+	end
+	game:GetService("RunService").RenderStepped:Wait()
+end
+
+function DoDirtyWork(Option)
+	if Option == "Add" then
+		if TradeFrame.Visible == true then
+			coroutine.resume(coroutine.create(function()
+				for i,v in pairs(TradeFrame.YourInventory.Grid:GetChildren()) do
+					if TradeFrame.Visible == true then
+						if CheckIfFreeSpace() then
+							if CheckIfOwn(v.Name) == true then else
+
+								AddPet(v.Name)
+							end
+						else
+							task.wait(TradeAcceptDelay)
+							AcceptTrade()
+							repeat
+								task.wait(TradeConfirmDelay)
+								ConfirmTrade()
+								game:GetService("RunService").RenderStepped:Wait()
+							until TradeFrame.TheirOffer.Ready.Visible == true or TradeFrame.Processing.Visible == true
+							return
+						end
+					end
+					game:GetService("RunService").RenderStepped:Wait()
+				end
+			end))
+			game:GetService("RunService").RenderStepped:Wait()
+		end
+		game:GetService("RunService").RenderStepped:Wait()
+	elseif Option == "Remove" then
+		coroutine.resume(coroutine.create(function()
+			for i,v in pairs(TradeFrame.YourOffer.Frame:GetChildren()) do
+				if v:IsA("Frame") then
+					RemovePet(v.GUID.Value)
+					game:GetService("RunService").RenderStepped:Wait()		
+				end
+				game:GetService("RunService").RenderStepped:Wait()
+			end
+		end))
+		game:GetService("RunService").RenderStepped:Wait()
+	end
+	game:GetService("RunService").RenderStepped:Wait()
+end
+
+local AutoSendTrade = false
+local AutoAddPets = false
+
+local Game = Window:NewTab("Auto Functions")
+local Section1 = Game:NewSection("Auto Trade")
+
+local PlayersT = {}
+local PlayerToTrade
+
+for i,v in pairs(game.Players:GetChildren()) do
+	table.insert(PlayersT, v.Name)
+end
+
+local dropdown = Section1:NewDropdown("Choose Player", "Spams The Trade!", PlayersT, function(currentOption)
+	PlayerToTrade = currentOption
+end)
+
+Section1:NewButton("Auto Trade Send", "Sends Trades!", function()	
+	AutoSendTrade = true
+	repeat
+		SendTrade(game.Players:FindFirstChild(PlayerToTrade))
+		task.wait(TradeSendDelay)
+		game:GetService("RunService").RenderStepped:Wait()
+	until AutoSendTrade == false
+end)
+
+Section1:NewButton("Auto Trade Disable", "Sends Trades!", function()	
+	AutoSendTrade = false
+end)
+
+local Section2 = Game:NewSection("Auto Pets")
+
+local OptionOfAuto = ""
+
+local dropdown2 = Section2:NewDropdown("Choose Option", "Option For Auto Give!", {"Add All", "Add Custom"}, function(currentOption)
+	OptionOfAuto = currentOption
+end)
+
+Section2:NewButton("Auto Add Pets Enable", "Auto Adds Pets!", function()
+	AutoAddPets = true
+	repeat
+		if OptionOfAuto == "Add All" then
+			if TradeFrame.Visible == true then
+				DoDirtyWork("Add")
+			end
+		elseif OptionOfAuto == "Add Custom" then
+			if TradeFrame.Visible == true then
+				DoCustomPets("Add")
+			end
+		end
+		game:GetService("RunService").RenderStepped:Wait()
+	until AutoAddPets == false
+end)
+
+
+Section2:NewButton("Auto Add Pets Disable", "Sends Trades!", function()	
+	AutoAddPets = false
+end)
+
+Section2:NewButton("Add All Pets", "Adds All Pets (only 8)", function()
+	if TradeFrame.Visible == true then
+		task.wait(1)
+		DoDirtyWork("Add")
+	end
+	game:GetService("RunService").RenderStepped:Wait()
+end)
+
+Section2:NewButton("Remove ALL Pets", "Removes All Pets (only 8)", function()
+	if TradeFrame.Visible == true then
+		task.wait(1)
+		DoCustomPets("Remove")
+	end
+	game:GetService("RunService").RenderStepped:Wait()
+end)
+
+local Game2 = Window:NewTab("Dupe Functions")
+local Section3 = Game2:NewSection("Dupe Trade")
+
+function Death()
+	spawn(function()
+		local args = {
+			[1] = "GetPlayerData"
+		}
+
+		game:GetService("ReplicatedStorage").NetworkRemoteFunction:InvokeServer(unpack(args))
+	end)
+end
+
+Section3:NewButton("Dupe Items", "Dupes All Items (UP TO 64 PETS) (DO 6 TRADES MAX)", function()
+	for i=1,2500 do
+		spawn(function()
+			Death() 
+		end)
+	end
+end)
+
+local Game3 = Window:NewTab("Inventory Functions")
+local Section4 = Game3:NewSection("Delete Duped Pets")
+
+Section4:NewButton("Delete Duped Pets", "Deletes all pets what are causing trade ban!", function()
+	local PetsFrame = 	Player.PlayerGui.ScreenGui.PetsFrame
+	local PetGrid = PetsFrame.Main.Pages.Pets.List.Grid
+
+	local Pets = {}
+
+	for i,v in pairs(PetGrid:GetChildren()) do
+		if v:IsA("ImageButton") then
+			if Pets[v.Name] then
+				DeleteItem(v.Name)
+			else
+				Pets[v.Name] = true
+			end
+		end
+	end
+end)
+
+Section4:NewButton("Unlock All Pets", "Unlocks all pets!", function()
+	local PetsFrame = 	Player.PlayerGui.ScreenGui.PetsFrame
+	local PetGrid = PetsFrame.Main.Pages.Pets.List.Grid
+
+	for i,v in pairs(PetGrid:GetChildren()) do
+		if v:IsA("ImageButton") then
+			UnlockItem(v.Name)
+		end
+	end
+end)
+
+local Game4 = Window:NewTab("Settings/Credits")
+local Section5 = Game4:NewSection("Settings")
+
+Section5:NewSlider("Trade Send Delay", "Delay Between Sending Trades", 5, 0, function(s)
+	TradeSendDelay = s
+end)
+
+Section5:NewSlider("Trade Accept Delay", "Delay Between Accepting Trades", 5, 1, function(s)
+	TradeAcceptDelay = s
+end)
+
+Section5:NewSlider("Trade Confirm Delay", "Delay Between Confirming Trades", 5, 1, function(s)
+	TradeConfirmDelay = s
+end)
+
+Section5:NewButton("Anti AFK", "Never get kicked for been idle!", function()
+	game:GetService("Players").LocalPlayer.Idled:connect(function()
+		local vu = game:GetService("VirtualUser")
+		vu:Button2Down(Vector2.new(0,0),workspace.CurrentCamera.CFrame)
+		wait(1)
+		vu:Button2Up(Vector2.new(0,0),workspace.CurrentCamera.CFrame)
+	end)
+end)
+
+Game4:NewSection("Credits: Desync#8545")
+Game4:NewSection("Discord Server: https://discord.gg/bgs")
+
+Section5:NewKeybind("Toggle Keybind", "Set Keybind to toggle the gui", Enum.KeyCode.F, function()
+	Library:ToggleUI()
+end)
